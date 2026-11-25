@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useId } from 'react';
 import { calculateCompoundInterest, CompoundInterestResult } from '../../services/calculatorEngine';
 import { GenerativeWidgetProps, WidgetPayloadMap } from './types';
+import { useOptionalStudioContext } from '../../context/StudioContext';
 import { ExternalLink } from 'lucide-react';
 
 const FREQUENCY_LABELS: Record<1 | 2 | 4 | 12 | 365, string> = {
@@ -16,6 +17,7 @@ export const CompoundGrowthWidget: React.FC<GenerativeWidgetProps<WidgetPayloadM
   onNavigateTab
 }) => {
   const uid = useId();
+  const studio = useOptionalStudioContext();
   const interestGradId = `interestGrad-${uid}`;
   const principalGradId = `principalGrad-${uid}`;
   const freqSelectId = `comp-freq-${uid}`;
@@ -287,7 +289,16 @@ export const CompoundGrowthWidget: React.FC<GenerativeWidgetProps<WidgetPayloadM
 
         <button
           type="button"
-          onClick={() => onNavigateTab?.('compound-interest')}
+          onClick={() => {
+            studio?.setCompoundParams({
+              initialInvestment,
+              monthlyContribution,
+              annualInterestRate,
+              years,
+              compoundingFrequency
+            });
+            onNavigateTab?.('compound-interest');
+          }}
           className="px-3 py-1.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.09] text-graphite-lightText dark:text-graphite-text font-medium text-xs transition-colors flex items-center gap-1"
         >
           <span>Open in Compound Studio</span>

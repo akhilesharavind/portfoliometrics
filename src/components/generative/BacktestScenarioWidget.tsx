@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useId } from 'react';
 import { runBacktest, BacktestResult, AllocationItem } from '../../services/backtestingEngine';
 import { LineChart, DonutChart } from '../SimpleChart';
 import { GenerativeWidgetProps, WidgetPayloadMap } from './types';
+import { useOptionalStudioContext } from '../../context/StudioContext';
 import { Sliders, ExternalLink, Check, RefreshCw } from 'lucide-react';
 
 const DEFAULT_ALLOCATIONS: AllocationItem[] = [
@@ -20,8 +21,9 @@ export const BacktestScenarioWidget: React.FC<GenerativeWidgetProps<WidgetPayloa
       ? payload.allocations.map(a => ({ ...a }))
       : DEFAULT_ALLOCATIONS
   );
+  const studio = useOptionalStudioContext();
   const [initialValue, setInitialValue] = useState<number>(payload?.initialValue ?? 10000);
-  const [startYear, setStartYear] = useState<number>(payload?.startYear ?? 2015);
+  const [startYear, setStartYear] = useState<number>(payload?.startYear ?? 2014);
   const [endYear, setEndYear] = useState<number>(payload?.endYear ?? 2025);
   const [benchmark, setBenchmark] = useState<string>(payload?.benchmark ?? 'SPY');
   const [applied, setApplied] = useState<boolean>(false);
@@ -96,6 +98,16 @@ export const BacktestScenarioWidget: React.FC<GenerativeWidgetProps<WidgetPayloa
   };
 
   const handleOpenInBacktester = () => {
+    if (studio) {
+      studio.setBacktestParams({
+        initialValue,
+        startYear,
+        endYear,
+        cashFlowType: 'none',
+        cashFlowAmount: 0,
+        benchmark
+      });
+    }
     if (onApplyToWorkspace) {
       onApplyToWorkspace(allocations);
     }

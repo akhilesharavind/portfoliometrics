@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { POPULAR_PORTFOLIOS } from '../data/popularPortfolios';
+import { useOptionalStudioContext } from '../context/StudioContext';
 
 interface PopularPortfoliosPageProps {
   onSelectPortfolio: (allocations: { symbol: string; weight: number }[]) => void;
 }
 
 export const PopularPortfoliosPage: React.FC<PopularPortfoliosPageProps> = ({ onSelectPortfolio }) => {
+  const studio = useOptionalStudioContext();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   const categories = ['All', 'Classic', 'All-Weather', 'Growth', 'Income'];
@@ -38,6 +40,7 @@ export const PopularPortfoliosPage: React.FC<PopularPortfoliosPageProps> = ({ on
           <button
             key={cat}
             type="button"
+            aria-pressed={selectedCategory === cat}
             onClick={() => setSelectedCategory(cat)}
             className={`min-h-[44px] inline-flex items-center text-xs px-3.5 py-2 rounded-md font-medium transition-colors shrink-0 ${
               selectedCategory === cat
@@ -65,9 +68,9 @@ export const PopularPortfoliosPage: React.FC<PopularPortfoliosPageProps> = ({ on
                 <span className="text-[10px] text-graphite-lightMuted dark:text-graphite-muted font-mono tabular">10-year metrics</span>
               </div>
 
-              <h3 className="text-sm font-medium text-graphite-lightText dark:text-graphite-text">
+              <h2 className="text-sm font-medium text-graphite-lightText dark:text-graphite-text">
                 {portfolio.name}
-              </h3>
+              </h2>
               <p className="text-[11px] text-graphite-lightMuted dark:text-graphite-muted mt-0.5 mb-2">
                 {portfolio.tagline}
               </p>
@@ -111,10 +114,20 @@ export const PopularPortfoliosPage: React.FC<PopularPortfoliosPageProps> = ({ on
 
               <button
                 type="button"
-                onClick={() => onSelectPortfolio(portfolio.allocations.map(a => ({ symbol: a.symbol, weight: a.weight })))}
+                onClick={() => {
+                  studio?.setBacktestParams({
+                    initialValue: 10000,
+                    startYear: 2016,
+                    endYear: 2025,
+                    cashFlowType: 'none',
+                    cashFlowAmount: 0,
+                    benchmark: 'SPY'
+                  });
+                  onSelectPortfolio(portfolio.allocations.map(a => ({ symbol: a.symbol, weight: a.weight })));
+                }}
                 className="w-full py-2.5 px-3 rounded-md bg-black/[0.04] dark:bg-white/[0.05] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-graphite-lightText dark:text-graphite-text text-xs font-medium transition-colors min-h-[44px]"
               >
-                Simulate in Backtester
+                Simulate in Backtester (2016-2025)
               </button>
             </div>
           </div>

@@ -68,11 +68,28 @@ export function runMonteCarloSimulation(params: MonteCarloParams): MonteCarloRes
   const sigma = safeVol / 100;
   const inflation = safeInflation / 100;
 
+  // Deterministic seeded PRNG (Mulberry32) so identical inputs yield reproducible paths
+  // across the AI summary and interactive fan chart.
+  let seed = (
+    Math.round(safeInitial) * 73856093 ^
+    Math.round(safeReturn * 100) * 19349663 ^
+    Math.round(safeVol * 100) * 83492791 ^
+    Math.round(safeWithdrawal) * 2654435761 ^
+    safeYears * 1597334677
+  ) >>> 0;
+  if (seed === 0) seed = 42;
+  const nextRand = () => {
+    seed = (seed + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
   // Box-Muller transform for normal random numbers
   const randomNormal = () => {
     let u = 0, v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
+    while (u === 0) u = nextRand();
+    while (v === 0) v = nextRand();
     return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
   };
 

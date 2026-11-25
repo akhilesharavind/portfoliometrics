@@ -43,10 +43,11 @@ function normalizeAllocationsTo100(items: AllocationItem[]): AllocationItem[] {
 }
 
 export function parseCustomAllocations(prompt: string): AllocationItem[] | null {
-  const combined = /(\d+(?:\.\d+)?)\s*%\s*([A-Za-z]{2,5}(?:-[A-Za-z]{2,4})?)|([A-Za-z]{2,5}(?:-[A-Za-z]{2,4})?)\s*[:=(]?\s*(\d+(?:\.\d+)?)\s*%/g;
+  const withPercent = /(\d+(?:\.\d+)?)\s*%\s*([A-Za-z]{2,5}(?:-[A-Za-z]{2,4})?)|([A-Za-z]{2,5}(?:-[A-Za-z]{2,4})?)\s*[:=(]?\s*(\d+(?:\.\d+)?)\s*%/g;
+  const withoutPercent = /\b(\d{1,3}(?:\.\d+)?)\s+([A-Z]{2,5})\b|\b([A-Z]{2,5})\s*[:=]?\s*(\d{1,3}(?:\.\d+)?)\b/gi;
   const merged = new Map<string, number>();
 
-  for (const match of prompt.matchAll(combined)) {
+  for (const match of prompt.matchAll(withPercent)) {
     const rawWeight = match[1] ?? match[4];
     const rawSym = match[2] ?? match[3];
     if (!rawWeight || !rawSym) continue;
@@ -55,6 +56,19 @@ export function parseCustomAllocations(prompt: string): AllocationItem[] | null 
     const w = parseFloat(rawWeight);
     if (!Number.isFinite(w) || w <= 0) continue;
     merged.set(asset.symbol, (merged.get(asset.symbol) || 0) + w);
+  }
+
+  if (merged.size === 0) {
+    for (const match of prompt.matchAll(withoutPercent)) {
+      const rawWeight = match[1] ?? match[4];
+      const rawSym = match[2] ?? match[3];
+      if (!rawWeight || !rawSym) continue;
+      const asset = getAsset(rawSym);
+      if (!asset) continue;
+      const w = parseFloat(rawWeight);
+      if (!Number.isFinite(w) || w <= 0) continue;
+      merged.set(asset.symbol, (merged.get(asset.symbol) || 0) + w);
+    }
   }
 
   if (merged.size === 0) return null;
@@ -288,16 +302,20 @@ export function processAiQuery(
       riskFreeRate: 0.04
     });
 
+    const drawdownComparison = Math.abs(res.maxDrawdown) <= Math.abs(res.benchmarkMaxDrawdown)
+      ? `contained downside at **${res.maxDrawdown}%** compared to **${res.benchmarkMaxDrawdown}%** for S&P 500`
+      : `experienced a deeper peak-to-trough drawdown (**${res.maxDrawdown}%**) than S&P 500 (**${res.benchmarkMaxDrawdown}%**) due to long-duration bond sensitivity during rate hikes`;
+
     const text = `### Ray Dalio All Weather Strategy Analysis\n\n` +
-      `The **All-Weather Strategy** is built upon Risk Parity principles to thrive across four macroeconomic environments: inflation, deflation, rising growth, and falling growth.\n\n` +
+      `The **All-Weather Strategy** is built upon Risk Parity principles across equities, long/intermediate Treasuries, gold, and real estate.\n\n` +
       `**Key Findings (2012 - 2025):**\n` +
       `- **CAGR**: **${res.cagr}%** vs **${res.benchmarkCagr}%** (S&P 500)\n` +
-      `- **Volatility**: **${res.volatility}%** (approx. half the volatility of pure equities)\n` +
+      `- **Volatility**: **${res.volatility}%**\n` +
       `- **Sharpe Ratio**: **${res.sharpeRatio}**\n` +
       `- **Max Drawdown**: **${res.maxDrawdown}%** (versus ${res.benchmarkMaxDrawdown}% for S&P 500)\n\n` +
       `**Asset Allocation:**\n` +
       allocations.map(a => `- **${a.symbol}**: **${a.weight}%**`).join('\n') +
-      `\n\n*Strategic Verdict*: Ideal for capital preservation, offering a remarkably smooth equity curve at the expense of high bull-market equity upside.`;
+      `\n\n*Strategic Verdict*: Over the 2012 - 2025 window, this allocation ${drawdownComparison}.`;
 
     const parts: ChatMessagePart[] = [
       { type: 'text', content: text },
@@ -487,8 +505,8 @@ export function processAiQuery(
     return { text, backtestData: res, parts };
   }
 
-  // Priority 6: Compound Interest / Savings
-  if (p.includes('compound') || p.includes('savings') || p.includes('monthly deposit')) {
+  // Priority 6: Compound Interest / Savings (skip if user asked for a specific allocation like 60/40)
+  if ((p.includes('compound') || p.includes('savings') || p.includes('monthly deposit')) && !p.includes('60/40') && !p.includes('classic') && !p.includes('balanced')) {
     const monthlyMatch = prompt.match(/\$(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:([kmb])(?![a-z]))?(?=\s*(?:\/\s*mo|\/\s*month|per month|monthly|deposit|contribution))/i);
     const initialMatch = prompt.match(/(?:initial|starting|start|principal|with)\s*(?:investment|deposit|of)?\s*\$(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:([kmb])(?![a-z]))?/i);
     const dollars = parseDollarAmounts(prompt);
@@ -608,11 +626,14 @@ export function processAiQuery(
   if (p.includes('60/40') || p.includes('classic') || p.includes('balanced')) {
     const portfolio = POPULAR_PORTFOLIOS.find(x => x.id === 'classic-60-40')!;
     const allocations: AllocationItem[] = portfolio.allocations.map(a => ({ symbol: a.symbol, weight: a.weight }));
+    const depositMatch = prompt.match(/\$?(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:monthly|per month|\/mo|deposit)/i);
+    const hasMonthlyDeposit = p.includes('monthly') || p.includes('deposit');
+    const monthlyDeposit = hasMonthlyDeposit && depositMatch ? parseFloat(depositMatch[1].replace(/,/g, '')) : 0;
     const res = runBacktest({
       allocations,
       initialValue: 10000,
-      cashFlowType: 'none',
-      cashFlowAmount: 0,
+      cashFlowType: monthlyDeposit > 0 ? 'monthly_contribution' : 'none',
+      cashFlowAmount: monthlyDeposit,
       startYear: 2012,
       endYear: 2025,
       rebalancing: 'annually',
@@ -620,11 +641,15 @@ export function processAiQuery(
       riskFreeRate: 0.04
     });
 
+    const cashFlowNote = monthlyDeposit > 0
+      ? ` with **$${monthlyDeposit.toLocaleString('en-US')}/month** recurring deposits`
+      : '';
+
     const text = `### Classic 60/40 Balanced Portfolio\n\n` +
-      `The benchmark institutional allocation combining **60% US Total Stock Market (VTI)** and **40% Total Bond Market (BND)**.\n\n` +
+      `The benchmark institutional allocation combining **60% US Total Stock Market (VTI)** and **40% Total Bond Market (BND)**${cashFlowNote}.\n\n` +
       `**Performance Summary:**\n` +
-      `- **Compound Growth**: $10,000 grew to **$${res.finalValue.toLocaleString('en-US')}**\n` +
-      `- **CAGR**: **${res.cagr}%**\n` +
+      `- **Ending Balance**: **$${res.finalValue.toLocaleString('en-US')}** (Total deposited: $${res.totalDeposits.toLocaleString('en-US')})\n` +
+      `- **CAGR (TWR)**: **${res.cagr}%**\n` +
       `- **Sharpe Ratio**: **${res.sharpeRatio}**\n` +
       `- **Max Drawdown**: **${res.maxDrawdown}%**\n\n` +
       `*Strategic Verdict*: Provides reliable diversification, though during correlated inflationary shocks (such as 2022), both bonds and equities can experience concurrent drawdowns.`;
@@ -783,18 +808,37 @@ export function processAiQuery(
     return { text, backtestData: res, parts };
   }
 
-  // Priority 8: Workspace-aware default fallback
+  // Priority 8: Workspace-aware query or explicit "not understood" response
   const useWorkspace =
     validWorkspace.length > 0 &&
     (p.includes('workspace') || p.includes('active') || p.includes('current'));
-  const targetAllocations: AllocationItem[] = useWorkspace
-    ? validWorkspace
-    : [
-        { symbol: 'VTI', weight: 70 },
-        { symbol: 'VXUS', weight: 20 },
-        { symbol: 'BND', weight: 10 }
-      ];
 
+  if (!useWorkspace) {
+    const supportedTickers = ASSET_DATABASE.map(a => a.symbol).join(', ');
+    const hasPercentOrNumber = /\d+\s*%/.test(prompt);
+    const hasZeroWeight = /\b0\s*%?\s*[A-Za-z]{2,5}\b/.test(prompt);
+    const reason = hasZeroWeight
+      ? 'All provided allocation weights are 0%. Provide positive percentages summing above 0%.'
+      : hasPercentOrNumber
+        ? 'One or more requested tickers are not in the supported historical asset database.'
+        : 'Input was not recognized as a portfolio allocation, optimization, Monte Carlo, compound interest, or CAGR query.';
+
+    const text = `### Query Not Understood\n\n` +
+      `${reason}\n\n` +
+      `**Supported Examples:**\n` +
+      `- Custom backtest: \`60% VTI, 40% BND\` or \`60 VTI 40 BND\`\n` +
+      `- Optimization: \`Optimize efficient frontier for VTI, VXUS, BND, GLD\`\n` +
+      `- Retirement simulation: \`Monte Carlo $1,000,000 portfolio with $40,000 annual withdrawal for 30 years\`\n` +
+      `- Calculators: \`Compound interest $10,000 with $500/mo at 7% for 20 years\` or \`CAGR from $10,000 to $35,000 over 10 years\`\n\n` +
+      `**Supported Tickers:** ${supportedTickers}`;
+
+    return {
+      text,
+      parts: [{ type: 'text', content: text }]
+    };
+  }
+
+  const targetAllocations: AllocationItem[] = validWorkspace;
   const res = runBacktest({
     allocations: targetAllocations,
     initialValue: 10000,
@@ -808,8 +852,8 @@ export function processAiQuery(
   });
 
   const allocLabel = targetAllocations.map(a => `${a.weight}% ${a.symbol}`).join(', ');
-  const text = `### AI Portfolio Analysis & Backtest\n\n` +
-    `Analyzing strategy: **${allocLabel}** over **2014 - 2025**.\n\n` +
+  const text = `### Active Workspace Strategy Analysis\n\n` +
+    `Analyzing workspace strategy: **${allocLabel}** over **2014 - 2025**.\n\n` +
     `- **Final Portfolio Value**: **$${res.finalValue.toLocaleString('en-US')}** (from $10,000 initial investment)\n` +
     `- **Annualized Return (CAGR)**: **${res.cagr}%**\n` +
     `- **Risk-Adjusted Sharpe Ratio**: **${res.sharpeRatio}**\n` +
@@ -822,7 +866,7 @@ export function processAiQuery(
       type: 'widget',
       widgetType: 'backtest_scenario',
       payload: {
-        title: useWorkspace ? 'Active Workspace Strategy' : 'Global Core Strategy (70/20/10)',
+        title: 'Active Workspace Strategy',
         allocations: targetAllocations,
         initialValue: 10000,
         startYear: 2014,

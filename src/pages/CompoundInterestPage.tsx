@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { calculateCompoundInterest, CompoundInterestResult } from '../services/calculatorEngine';
 import { LineChart } from '../components/SimpleChart';
+import { useOptionalStudioContext } from '../context/StudioContext';
 
 export const CompoundInterestPage: React.FC = () => {
-  const [initialInvestment, setInitialInvestment] = useState<number>(10000);
-  const [monthlyContribution, setMonthlyContribution] = useState<number>(500);
-  const [annualInterestRate, setAnnualInterestRate] = useState<number>(8.0);
-  const [years, setYears] = useState<number>(20);
-  const [compoundingFrequency, setCompoundingFrequency] = useState<1 | 2 | 4 | 12 | 365>(12);
+  const studio = useOptionalStudioContext();
+  const handoff = studio?.compoundParams;
+  const [initialInvestment, setInitialInvestment] = useState<number>(handoff?.initialInvestment ?? 10000);
+  const [monthlyContribution, setMonthlyContribution] = useState<number>(handoff?.monthlyContribution ?? 500);
+  const [annualInterestRate, setAnnualInterestRate] = useState<number>(handoff?.annualInterestRate ?? 8.0);
+  const [years, setYears] = useState<number>(handoff?.years ?? 20);
+  const [compoundingFrequency, setCompoundingFrequency] = useState<1 | 2 | 4 | 12 | 365>(handoff?.compoundingFrequency ?? 12);
   const [depositTiming, setDepositTiming] = useState<'beginning' | 'end'>('end');
+
+  useEffect(() => {
+    if (!handoff) return;
+    if (handoff.initialInvestment !== undefined) setInitialInvestment(handoff.initialInvestment);
+    if (handoff.monthlyContribution !== undefined) setMonthlyContribution(handoff.monthlyContribution);
+    if (handoff.annualInterestRate !== undefined) setAnnualInterestRate(handoff.annualInterestRate);
+    if (handoff.years !== undefined) setYears(handoff.years);
+    if (handoff.compoundingFrequency !== undefined) setCompoundingFrequency(handoff.compoundingFrequency);
+  }, [handoff]);
 
   const result: CompoundInterestResult = calculateCompoundInterest({
     initialInvestment,

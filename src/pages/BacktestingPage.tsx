@@ -46,31 +46,31 @@ const getInitialAllocations = (
 };
 
 export const BacktestingPage: React.FC<BacktestingPageProps> = ({ initialAllocations }) => {
-  const { activeAllocations, setActiveAllocations, applyAllocationsToWorkspace, toggleCopilot } = useStudioContext();
+  const { activeAllocations, setActiveAllocations, applyAllocationsToWorkspace, toggleCopilot, backtestParams } = useStudioContext();
 
   const [allocations, setAllocations] = useState<AllocationItem[]>(() =>
     getInitialAllocations(activeAllocations, initialAllocations)
   );
 
-  const [initialValue, setInitialValue] = useState<number>(10000);
-  const [cashFlowType, setCashFlowType] = useState<'none' | 'monthly_contribution' | 'annual_contribution' | 'monthly_withdrawal'>('none');
-  const [cashFlowAmount, setCashFlowAmount] = useState<number>(500);
-  const [startYear, setStartYear] = useState<number>(2012);
-  const [endYear, setEndYear] = useState<number>(2025);
+  const [initialValue, setInitialValue] = useState<number>(backtestParams?.initialValue ?? 10000);
+  const [cashFlowType, setCashFlowType] = useState<'none' | 'monthly_contribution' | 'annual_contribution' | 'monthly_withdrawal'>(backtestParams?.cashFlowType ?? 'none');
+  const [cashFlowAmount, setCashFlowAmount] = useState<number>(backtestParams?.cashFlowAmount ?? 500);
+  const [startYear, setStartYear] = useState<number>(backtestParams?.startYear ?? 2012);
+  const [endYear, setEndYear] = useState<number>(backtestParams?.endYear ?? 2025);
   const [rebalancing] = useState<'annually' | 'semi-annually' | 'quarterly' | 'monthly' | 'none'>('annually');
-  const [benchmark, setBenchmark] = useState<string>('SPY');
+  const [benchmark, setBenchmark] = useState<string>(backtestParams?.benchmark ?? 'SPY');
   const [riskFreeRate] = useState<number>(0.04);
 
   const [result, setResult] = useState<BacktestResult>(() => {
     return runBacktest({
       allocations: getInitialAllocations(activeAllocations, initialAllocations),
-      initialValue: 10000,
-      cashFlowType: 'none',
-      cashFlowAmount: 500,
-      startYear: 2012,
-      endYear: 2025,
+      initialValue: backtestParams?.initialValue ?? 10000,
+      cashFlowType: backtestParams?.cashFlowType ?? 'none',
+      cashFlowAmount: backtestParams?.cashFlowAmount ?? 500,
+      startYear: backtestParams?.startYear ?? 2012,
+      endYear: backtestParams?.endYear ?? 2025,
       rebalancing: 'annually',
-      benchmark: 'SPY',
+      benchmark: backtestParams?.benchmark ?? 'SPY',
       riskFreeRate: 0.04
     });
   });
@@ -121,6 +121,34 @@ export const BacktestingPage: React.FC<BacktestingPageProps> = ({ initialAllocat
     }
   }, [initialAllocations]);
 
+  // Sync external backtestParams handoff from StudioContext
+  useEffect(() => {
+    if (!backtestParams) return;
+    const nextInit = backtestParams.initialValue ?? paramsRef.current.initialValue;
+    const nextStart = backtestParams.startYear ?? paramsRef.current.startYear;
+    const nextEnd = backtestParams.endYear ?? paramsRef.current.endYear;
+    const nextCfType = backtestParams.cashFlowType ?? paramsRef.current.cashFlowType;
+    const nextCfAmt = backtestParams.cashFlowAmount ?? paramsRef.current.cashFlowAmount;
+    const nextBench = backtestParams.benchmark ?? paramsRef.current.benchmark;
+    setInitialValue(nextInit);
+    setStartYear(nextStart);
+    setEndYear(nextEnd);
+    setCashFlowType(nextCfType);
+    setCashFlowAmount(nextCfAmt);
+    setBenchmark(nextBench);
+    setResult(runBacktest({
+      allocations: allocationsRef.current,
+      initialValue: nextInit,
+      cashFlowType: nextCfType,
+      cashFlowAmount: nextCfAmt,
+      startYear: nextStart,
+      endYear: nextEnd,
+      rebalancing: paramsRef.current.rebalancing,
+      benchmark: nextBench,
+      riskFreeRate: paramsRef.current.riskFreeRate
+    }));
+  }, [backtestParams]);
+
   // Synchronize external activeAllocations from StudioContext without feedback loops
   useEffect(() => {
     if (
@@ -152,22 +180,50 @@ export const BacktestingPage: React.FC<BacktestingPageProps> = ({ initialAllocat
     setResult(res);
   };
 
+  const [allocNotice, setAllocNotice] = useState<string | null>(null);
+
   const handleAddAsset = () => {
-    const next = [...allocations, { symbol: 'AAPL', weight: 10 }];
+    const used = new Set(allocations.map(a => a.symbol));
+    const nextAsset = ASSET_DATABASE.find(a => !used.has(a.symbol));
+    if (!nextAsset) {
+      setAllocNotice('All supported assets are already included.');
+      return;
+    }
+    setAllocNotice(null);
+    const next = [...allocations, { symbol: nextAsset.symbol, weight: 10 }];
     setAllocations(next);
     setActiveAllocations(next);
   };
 
   const handleRemoveAsset = (index: number) => {
-    if (allocations.length <= 1) return;
+    if (allocations.length <= 1) {
+      setAllocNotice('At least 1 asset is required for backtesting.');
+      return;
+    }
+    setAllocNotice(null);
     const next = allocations.filter((_, i) => i !== index);
     setAllocations(next);
     setActiveAllocations(next);
   };
 
   const handleAllocationChange = (index: number, field: keyof AllocationItem, val: any) => {
+    if (field === 'symbol') {
+      const sym = String(val).toUpperCase();
+      if (allocations.some((a, idx) => idx !== index && a.symbol === sym)) {
+        setAllocNotice(`${sym} is already in the portfolio. Adjust its weight row instead.`);
+        return;
+      }
+      setAllocNotice(null);
+      const updated = [...allocations];
+      updated[index] = { ...updated[index], symbol: sym };
+      setAllocations(updated);
+      setActiveAllocations(updated);
+      return;
+    }
+    const clampedWeight = Math.max(0, Math.min(100, Number(val) || 0));
+    setAllocNotice(null);
     const updated = [...allocations];
-    updated[index] = { ...updated[index], [field]: val };
+    updated[index] = { ...updated[index], weight: clampedWeight };
     setAllocations(updated);
     setActiveAllocations(updated);
   };
@@ -612,10 +668,19 @@ export const BacktestingPage: React.FC<BacktestingPageProps> = ({ initialAllocat
               type="button"
               disabled={totalWeight === 0 || initialValue <= 0}
               onClick={handleRun}
-              className="w-full mt-2 py-2 px-3 rounded-md bg-primary hover:bg-primary-hover disabled:opacity-40 text-white text-xs font-medium transition-colors"
+              className="w-full mt-2 py-2 px-3 min-h-[44px] rounded-md bg-primary hover:bg-primary-hover disabled:opacity-40 text-white text-xs font-medium transition-colors"
             >
               Execute Backtest Simulation
             </button>
+            {(totalWeight === 0 || initialValue <= 0 || allocNotice) && (
+              <p role="alert" className="text-[11px] text-semantic-warningLight dark:text-semantic-warning mt-1">
+                {initialValue <= 0
+                  ? 'Execution disabled: initial investment must be greater than $0.'
+                  : totalWeight === 0
+                    ? 'Execution disabled: total allocation weight must be greater than 0%.'
+                    : allocNotice}
+              </p>
+            )}
           </div>
         </div>
 

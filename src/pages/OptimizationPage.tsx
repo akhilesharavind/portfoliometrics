@@ -138,20 +138,23 @@ export const OptimizationPage: React.FC = () => {
             <div className="text-xs font-medium text-graphite-lightText dark:text-graphite-text">Selected asset universe</div>
             <div className="text-[11px] text-graphite-lightMuted dark:text-graphite-muted">2 to 8 assets used for covariance matrix modeling</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="opt-add-symbol" className="sr-only">
               Add asset symbol to universe
             </label>
             <select
               id="opt-add-symbol"
+              disabled={selectedSymbols.length >= 8}
               onChange={(e) => {
                 if (e.target.value) handleAddSymbol(e.target.value);
                 e.target.value = '';
               }}
               defaultValue=""
-              className="text-xs px-2.5 py-2 rounded-md bg-graphite-lightRaised dark:bg-graphite-raised border border-black/[0.08] dark:border-white/[0.08] text-graphite-lightText dark:text-graphite-text"
+              className="text-xs px-2.5 py-2 min-h-[44px] rounded-md bg-graphite-lightRaised dark:bg-graphite-raised border border-black/[0.08] dark:border-white/[0.08] text-graphite-lightText dark:text-graphite-text disabled:opacity-50"
             >
-              <option value="" disabled>+ Add symbol</option>
+              <option value="" disabled>
+                {selectedSymbols.length >= 8 ? 'Max 8 assets reached' : '+ Add symbol'}
+              </option>
               {ASSET_DATABASE.filter(a => !selectedSymbols.includes(a.symbol)).map(a => (
                 <option key={a.symbol} value={a.symbol}>{a.symbol} · {a.name}</option>
               ))}
@@ -159,7 +162,7 @@ export const OptimizationPage: React.FC = () => {
             <button
               type="button"
               onClick={handleRun}
-              className="text-xs px-3.5 py-2 rounded-md bg-primary hover:bg-primary-hover text-white font-medium transition-colors"
+              className="text-xs px-3.5 py-2 min-h-[44px] rounded-md bg-primary hover:bg-primary-hover text-white font-medium transition-colors"
             >
               Calculate Efficient Frontier
             </button>
@@ -375,7 +378,13 @@ export const OptimizationPage: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto select-none" style={{ minWidth: 480 }}>
+          <svg
+            role="img"
+            aria-label="Markowitz Efficient Frontier chart plotting volatility versus expected return"
+            viewBox={`0 0 ${width} ${height}`}
+            className="w-full h-auto select-none"
+            style={{ minWidth: 480 }}
+          >
             {/* Grid */}
             {[0, 0.25, 0.5, 0.75, 1].map((t, idx) => {
               const rVal = minRet + t * (maxRet - minRet);
@@ -410,7 +419,7 @@ export const OptimizationPage: React.FC = () => {
               y={getY(result.maxSharpePortfolio.expectedReturn) - 6}
               className="text-[10px] font-mono fill-graphite-lightText dark:fill-graphite-text font-medium"
             >
-              Max Sharpe ({result.maxSharpePortfolio.expectedReturn}%, {result.maxSharpePortfolio.volatility}%)
+              Max Sharpe ({result.maxSharpePortfolio.volatility}%, {result.maxSharpePortfolio.expectedReturn}%)
             </text>
 
             {/* Min Vol Marker */}

@@ -18,6 +18,8 @@ export const StudioCopilotDrawer: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   // Initial welcome message
   const [messages, setMessages] = useState<AiChatMessage[]>([
@@ -29,15 +31,42 @@ export const StudioCopilotDrawer: React.FC = () => {
     }
   ]);
 
-  // Close on Escape key
+  // Body scroll lock, initial focus, Escape key, and Tab focus trap
   useEffect(() => {
+    if (!copilotOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusTimer = window.setTimeout(() => {
+      closeBtnRef.current?.focus();
+    }, 10);
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && copilotOpen) {
+      if (e.key === 'Escape') {
         setCopilotOpen(false);
+        return;
+      }
+      if (e.key === 'Tab' && drawerRef.current) {
+        const focusables = drawerRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [copilotOpen, setCopilotOpen]);
 
   // Scroll to bottom on new messages
@@ -120,6 +149,7 @@ export const StudioCopilotDrawer: React.FC = () => {
 
   return (
     <div
+      ref={drawerRef}
       role="dialog"
       aria-modal="true"
       aria-label="Studio Copilot Drawer"
@@ -144,6 +174,7 @@ export const StudioCopilotDrawer: React.FC = () => {
             INFERENCE: CLIENT
           </span>
           <button
+            ref={closeBtnRef}
             type="button"
             onClick={() => setCopilotOpen(false)}
             aria-label="Close copilot drawer"

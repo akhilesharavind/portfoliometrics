@@ -132,45 +132,68 @@ export function runBacktest(params: BacktestParams): BacktestResult {
   let totalDeposits = initialValue;
   let twrTotalFactor = 1;
   let benchmarkTwrFactor = 1;
+  let twrEquity = 1;
+  let peakTwrEquity = 1;
+  let benchmarkTwrEquity = 1;
+  let peakBenchmarkTwrEquity = 1;
+  let accountDepleted = false;
 
   const yearHistory: YearPerformance[] = [];
   const returns: number[] = [];
   const benchmarkReturns: number[] = [];
-  let peakPortfolio = initialValue;
   let maxDrawdown = 0;
-  let peakBenchmark = initialValue;
   let benchmarkMaxDrawdown = 0;
 
   const safeCashFlow = Number.isFinite(cashFlowAmount) ? cashFlowAmount : 0;
 
+  // Deterministic zero-mean intra-year seasonal weights for realistic monthly peak-to-trough paths
+  // Sum of weights = 0, so the 12-month compounded product equals the exact annual return.
+  const intraYearShape = [-0.55, -0.95, 0.35, 0.45, -0.35, 0.25, 0.4, -0.45, -0.75, 0.5, 0.6, 0.5];
+
   for (let year = startYear; year <= endYear; year++) {
     const yearStartBalance = sleeveBalances.reduce((sum, b) => sum + b, 0);
 
-    const monthlyFactors = normalizedAllocations.map(alloc => {
+    const monthlyFactorsByAsset = normalizedAllocations.map(alloc => {
       const asset = getAsset(alloc.symbol);
       const ret = asset?.annualReturns[year] ?? (asset?.annualReturnMean ? asset.annualReturnMean * 100 : 8.0);
       const annualFactor = 1 + ret / 100;
-      return annualFactor > 0 ? Math.pow(annualFactor, 1 / 12) : 0;
+      if (annualFactor <= 0) return Array(12).fill(0);
+      const baseLog = Math.log(annualFactor) / 12;
+      const volAmp = (asset?.annualVolatility ?? 0.14) * (ret < 0 ? 0.22 : 0.14);
+      return intraYearShape.map(w => Math.exp(baseLog + volAmp * w));
     });
 
     const bRet = benchmarkAsset?.annualReturns[year] ?? 10.0;
     const bAnnualFactor = 1 + bRet / 100;
-    const bMonthlyFactor = bAnnualFactor > 0 ? Math.pow(bAnnualFactor, 1 / 12) : 0;
+    const bMonthlyFactors = bAnnualFactor > 0
+      ? intraYearShape.map(w => Math.exp(Math.log(bAnnualFactor) / 12 + (benchmarkAsset?.annualVolatility ?? 0.15) * (bRet < 0 ? 0.22 : 0.14) * w))
+      : Array(12).fill(0);
 
     let yearTwrFactor = 1;
     let yearDeposits = 0;
+    let depletedThisYear = false;
 
     for (let m = 1; m <= 12; m++) {
       const preGrowthTotal = sleeveBalances.reduce((sum, b) => sum + b, 0);
       for (let i = 0; i < sleeveBalances.length; i++) {
-        sleeveBalances[i] *= monthlyFactors[i];
+        sleeveBalances[i] *= monthlyFactorsByAsset[i][m - 1];
       }
-      benchmarkBalance *= bMonthlyFactor;
+      benchmarkBalance *= bMonthlyFactors[m - 1];
 
       const postGrowthTotal = sleeveBalances.reduce((sum, b) => sum + b, 0);
       if (preGrowthTotal > 0) {
-        yearTwrFactor *= postGrowthTotal / preGrowthTotal;
+        const monthFactor = postGrowthTotal / preGrowthTotal;
+        yearTwrFactor *= monthFactor;
+        twrEquity *= monthFactor;
+        if (twrEquity > peakTwrEquity) peakTwrEquity = twrEquity;
+        const dd = peakTwrEquity > 0 ? (twrEquity - peakTwrEquity) / peakTwrEquity : 0;
+        if (dd < maxDrawdown) maxDrawdown = dd;
       }
+
+      benchmarkTwrEquity *= bMonthlyFactors[m - 1];
+      if (benchmarkTwrEquity > peakBenchmarkTwrEquity) peakBenchmarkTwrEquity = benchmarkTwrEquity;
+      const bDd = peakBenchmarkTwrEquity > 0 ? (benchmarkTwrEquity - peakBenchmarkTwrEquity) / peakBenchmarkTwrEquity : 0;
+      if (bDd < benchmarkMaxDrawdown) benchmarkMaxDrawdown = bDd;
 
       let mCash = 0;
       if (cashFlowType === 'monthly_contribution') {
@@ -185,13 +208,18 @@ export function runBacktest(params: BacktestParams): BacktestResult {
         for (let i = 0; i < sleeveBalances.length; i++) {
           sleeveBalances[i] += mCash * (normalizedAllocations[i].weight / 100);
         }
+        yearDeposits += mCash;
       } else if (mCash < 0) {
         const curTotal = sleeveBalances.reduce((sum, b) => sum + b, 0);
         if (curTotal > 0) {
+          const actualWithdrawal = Math.min(curTotal, -mCash);
+          yearDeposits -= actualWithdrawal;
           if (curTotal + mCash <= 0) {
             for (let i = 0; i < sleeveBalances.length; i++) {
               sleeveBalances[i] = 0;
             }
+            depletedThisYear = true;
+            accountDepleted = true;
           } else {
             const scale = (curTotal + mCash) / curTotal;
             for (let i = 0; i < sleeveBalances.length; i++) {
@@ -202,7 +230,6 @@ export function runBacktest(params: BacktestParams): BacktestResult {
       }
 
       benchmarkBalance = Math.max(0, benchmarkBalance + mCash);
-      yearDeposits += mCash;
 
       const shouldRebalance =
         rebalancing === 'monthly' ||
@@ -221,27 +248,28 @@ export function runBacktest(params: BacktestParams): BacktestResult {
     portfolioBalance = sleeveBalances.reduce((sum, b) => sum + b, 0);
     totalDeposits += yearDeposits;
 
-    const twrYearPct = (yearTwrFactor - 1) * 100;
-    twrTotalFactor *= yearTwrFactor;
+    const twrYearPct = (yearStartBalance > 0 && portfolioBalance <= 0) || depletedThisYear
+      ? -100
+      : (yearStartBalance <= 0 && portfolioBalance <= 0)
+        ? 0
+        : (yearTwrFactor - 1) * 100;
+
+    if (accountDepleted && portfolioBalance <= 0) {
+      twrTotalFactor = 0;
+      maxDrawdown = -1;
+    } else {
+      twrTotalFactor *= yearTwrFactor;
+    }
     benchmarkTwrFactor *= Math.max(0, bAnnualFactor);
 
-    returns.push(yearTwrFactor - 1);
+    returns.push(twrYearPct / 100);
     benchmarkReturns.push(bRet / 100);
-
-    // Track drawdowns
-    if (portfolioBalance > peakPortfolio) peakPortfolio = portfolioBalance;
-    const currentDd = peakPortfolio > 0 ? (portfolioBalance - peakPortfolio) / peakPortfolio : 0;
-    if (currentDd < maxDrawdown) maxDrawdown = currentDd;
-
-    if (benchmarkBalance > peakBenchmark) peakBenchmark = benchmarkBalance;
-    const currentBDd = peakBenchmark > 0 ? (benchmarkBalance - peakBenchmark) / peakBenchmark : 0;
-    if (currentBDd < benchmarkMaxDrawdown) benchmarkMaxDrawdown = currentBDd;
 
     yearHistory.push({
       year,
       startBalance: Math.round(yearStartBalance),
       portfolioReturn: Number(twrYearPct.toFixed(2)),
-      deposits: yearDeposits,
+      deposits: Math.round(yearDeposits),
       endBalance: Math.round(portfolioBalance),
       benchmarkReturn: Number(bRet.toFixed(2)),
       benchmarkBalance: Math.round(benchmarkBalance)

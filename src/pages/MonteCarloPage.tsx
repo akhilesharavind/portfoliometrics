@@ -1,37 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { runMonteCarloSimulation, MonteCarloResult } from '../services/monteCarloEngine';
+import { useOptionalStudioContext } from '../context/StudioContext';
 
 export const MonteCarloPage: React.FC = () => {
-  const [initialInvestment, setInitialInvestment] = useState<number>(500000);
-  const [expectedAnnualReturn, setExpectedAnnualReturn] = useState<number>(8.5);
-  const [annualVolatility, setAnnualVolatility] = useState<number>(14.0);
-  const [annualWithdrawal, setAnnualWithdrawal] = useState<number>(20000);
-  const [inflationRate, setInflationRate] = useState<number>(2.5);
-  const [years, setYears] = useState<number>(30);
+  const studio = useOptionalStudioContext();
+  const handoff = studio?.monteCarloParams;
+  const simCount = studio?.activePlan === 'Pro' || studio?.activePlan === 'Institutional' ? 5000 : 1000;
 
-  const [result, setResult] = useState<MonteCarloResult>(() => {
+  const [initialInvestment, setInitialInvestment] = useState<number>(handoff?.initialInvestment ?? 500000);
+  const [expectedAnnualReturn, setExpectedAnnualReturn] = useState<number>(handoff?.expectedAnnualReturn ?? 8.5);
+  const [annualVolatility, setAnnualVolatility] = useState<number>(handoff?.annualVolatility ?? 14.0);
+  const [annualWithdrawal, setAnnualWithdrawal] = useState<number>(handoff?.annualWithdrawal ?? 20000);
+  const [inflationRate, setInflationRate] = useState<number>(handoff?.inflationRate ?? 2.5);
+  const [years, setYears] = useState<number>(handoff?.years ?? 30);
+
+  useEffect(() => {
+    if (!handoff) return;
+    if (handoff.initialInvestment !== undefined) setInitialInvestment(handoff.initialInvestment);
+    if (handoff.expectedAnnualReturn !== undefined) setExpectedAnnualReturn(handoff.expectedAnnualReturn);
+    if (handoff.annualVolatility !== undefined) setAnnualVolatility(handoff.annualVolatility);
+    if (handoff.annualWithdrawal !== undefined) setAnnualWithdrawal(handoff.annualWithdrawal);
+    if (handoff.inflationRate !== undefined) setInflationRate(handoff.inflationRate);
+    if (handoff.years !== undefined) setYears(handoff.years);
+  }, [handoff]);
+
+  const [simSeedOffset, setSimSeedOffset] = useState<number>(0);
+
+  const result: MonteCarloResult = useMemo(() => {
+    void simSeedOffset;
     return runMonteCarloSimulation({
-      initialInvestment: 500000,
-      expectedAnnualReturn: 8.5,
-      annualVolatility: 14.0,
-      annualWithdrawal: 20000,
-      inflationRate: 2.5,
-      years: 30,
-      simulationsCount: 1000
-    });
-  });
-
-  const handleSimulate = () => {
-    const res = runMonteCarloSimulation({
       initialInvestment,
       expectedAnnualReturn,
       annualVolatility,
       annualWithdrawal,
       inflationRate,
       years,
-      simulationsCount: 1000
+      simulationsCount: simCount
     });
-    setResult(res);
+  }, [initialInvestment, expectedAnnualReturn, annualVolatility, annualWithdrawal, inflationRate, years, simCount, simSeedOffset]);
+
+  const handleSimulate = () => {
+    setSimSeedOffset(prev => prev + 1);
   };
 
   const pts = result.percentilesByYear;

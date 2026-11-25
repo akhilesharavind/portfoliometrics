@@ -30,17 +30,65 @@ function CopilotFloatingTrigger() {
   );
 }
 
+const VALID_TABS = new Set([
+  'home',
+  'backtesting',
+  'optimization',
+  'monte-carlo',
+  'ai-assistant',
+  'cagr-calculator',
+  'compound-interest',
+  'popular-portfolios',
+  'pricing'
+]);
+
+const getTabFromPath = (pathname: string): string => {
+  const clean = pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  if (!clean) return 'home';
+  return VALID_TABS.has(clean) ? clean : 'home';
+};
+
+const getPathFromTab = (tab: string): string => {
+  return tab === 'home' ? '/' : `/${tab}`;
+};
+
+const readStoredTheme = (): boolean => {
+  try {
+    const saved = window.localStorage.getItem('pm_theme');
+    if (saved === 'light') return false;
+    if (saved === 'dark') return true;
+  } catch {
+    // ignore storage errors
+  }
+  return true;
+};
+
 function MainApp() {
   const { activeTab, setActiveTab, applyAllocationsToWorkspace } = useStudioContext();
-  const [currentTab, setCurrentTab] = useState<string>(activeTab || 'home');
-  const [darkMode, setDarkMode] = useState<boolean>(true);
+  const [currentTab, setCurrentTab] = useState<string>(() => getTabFromPath(window.location.pathname));
+  const [darkMode, setDarkMode] = useState<boolean>(readStoredTheme);
   const [selectedAllocations, setSelectedAllocations] = useState<any[] | undefined>(undefined);
   const [initialAiPrompt, setInitialAiPrompt] = useState<string | undefined>(undefined);
 
-  // Synchronize currentTab whenever activeTab in StudioContext changes
+  // Sync URL on browser Back/Forward
+  useEffect(() => {
+    const onPopState = () => {
+      const nextTab = getTabFromPath(window.location.pathname);
+      setCurrentTab(nextTab);
+      setActiveTab(nextTab);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [setActiveTab]);
+
+  // Synchronize currentTab and URL whenever activeTab in StudioContext changes
   useEffect(() => {
     if (activeTab && activeTab !== currentTab) {
       setCurrentTab(activeTab);
+      const targetPath = getPathFromTab(activeTab);
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ tab: activeTab }, '', targetPath);
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [activeTab]);
@@ -51,6 +99,11 @@ function MainApp() {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    try {
+      window.localStorage.setItem('pm_theme', darkMode ? 'dark' : 'light');
+    } catch {
+      // ignore storage errors
+    }
   }, [darkMode]);
 
   const handleSelectTab = (tab: string, initialPrompt?: string) => {
@@ -59,6 +112,10 @@ function MainApp() {
     }
     setCurrentTab(tab);
     setActiveTab(tab);
+    const targetPath = getPathFromTab(tab);
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ tab }, '', targetPath);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -131,7 +188,7 @@ function MainApp() {
 
 export function App() {
   return (
-    <StudioProvider>
+    <StudioProvider initialTab={getTabFromPath(window.location.pathname)}>
       <MainApp />
     </StudioProvider>
   );

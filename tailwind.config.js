@@ -23,14 +23,14 @@ export default {
           raised: '#282829',
           text: '#e3e7eb',
           secondary: '#969696',
-          muted: '#686a73',
+          muted: '#9ca3af',
           // Light equivalents (Drafting paper & titanium silver)
           lightBg: '#e3e7eb',
           lightCard: '#ffffff',
           lightRaised: '#d9dee3',
           lightText: '#1a1b1c',
-          lightSecondary: '#505159',
-          lightMuted: '#7a7d84',
+          lightSecondary: '#43454d',
+          lightMuted: '#4b4e57',
         },
         crox: {
           orange: '#ff5f14',

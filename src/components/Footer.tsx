@@ -55,11 +55,11 @@ export const Footer: React.FC<FooterProps> = ({ onSelectTab }) => {
           {/* Resources */}
           <div>
             <div className="font-medium text-graphite-lightText dark:text-graphite-text mb-3">Methodology</div>
-            <ul className="space-y-2">
-              <li><span className="text-graphite-lightMuted dark:text-graphite-muted">Markowitz efficient frontier</span></li>
-              <li><span className="text-graphite-lightMuted dark:text-graphite-muted">Geometric Brownian motion</span></li>
-              <li><span className="text-graphite-lightMuted dark:text-graphite-muted">Downside Sortino deviation</span></li>
-              <li><span className="text-graphite-lightMuted dark:text-graphite-muted">Risk parity contribution</span></li>
+            <ul className="space-y-1 sm:space-y-2">
+              <li><button type="button" onClick={() => onSelectTab('optimization')} className="min-h-[44px] sm:min-h-0 inline-flex items-center py-1 sm:py-0 hover:text-graphite-lightText dark:hover:text-graphite-text transition-colors text-left">Markowitz efficient frontier</button></li>
+              <li><button type="button" onClick={() => onSelectTab('monte-carlo')} className="min-h-[44px] sm:min-h-0 inline-flex items-center py-1 sm:py-0 hover:text-graphite-lightText dark:hover:text-graphite-text transition-colors text-left">Geometric Brownian motion</button></li>
+              <li><button type="button" onClick={() => onSelectTab('backtesting')} className="min-h-[44px] sm:min-h-0 inline-flex items-center py-1 sm:py-0 hover:text-graphite-lightText dark:hover:text-graphite-text transition-colors text-left">Downside Sortino deviation</button></li>
+              <li><button type="button" onClick={() => onSelectTab('optimization')} className="min-h-[44px] sm:min-h-0 inline-flex items-center py-1 sm:py-0 hover:text-graphite-lightText dark:hover:text-graphite-text transition-colors text-left">Risk parity contribution</button></li>
             </ul>
           </div>
         </div>

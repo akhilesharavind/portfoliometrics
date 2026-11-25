@@ -1,13 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { calculateCagr, CagrResult } from '../services/calculatorEngine';
 import { LineChart } from '../components/SimpleChart';
+import { useOptionalStudioContext } from '../context/StudioContext';
 
 export const CagrCalculatorPage: React.FC = () => {
-  const [initialValue, setInitialValue] = useState<number>(10000);
-  const [finalValue, setFinalValue] = useState<number>(35000);
-  const [years, setYears] = useState<number>(10);
+  const studio = useOptionalStudioContext();
+  const handoff = studio?.cagrParams;
+  const [initialValue, setInitialValue] = useState<number>(handoff?.initialValue ?? 10000);
+  const [finalValue, setFinalValue] = useState<number>(handoff?.finalValue ?? 35000);
+  const [years, setYears] = useState<number>(handoff?.years ?? 10);
 
-  const result: CagrResult = calculateCagr({ initialValue, finalValue, years });
+  useEffect(() => {
+    if (!handoff) return;
+    if (handoff.initialValue !== undefined) setInitialValue(handoff.initialValue);
+    if (handoff.finalValue !== undefined) setFinalValue(handoff.finalValue);
+    if (handoff.years !== undefined) setYears(handoff.years);
+  }, [handoff]);
+
+  const validationError = !Number.isFinite(initialValue) || initialValue <= 0
+    ? 'Initial investment must be greater than $0.'
+    : !Number.isFinite(finalValue) || finalValue < 0
+      ? 'Ending value cannot be negative.'
+      : !Number.isFinite(years) || years <= 0
+        ? 'Time horizon must be greater than 0 years.'
+        : null;
+
+  const isInvalid = validationError !== null;
+  const result: CagrResult = isInvalid
+    ? { cagr: 0, totalGain: 0, totalReturnPercent: 0, yearlySchedule: [] }
+    : calculateCagr({ initialValue, finalValue, years });
+
+  const formatUsd = (val: number) =>
+    val < 0 ? `-$${Math.abs(val).toLocaleString()}` : `$${val.toLocaleString()}`;
 
   const chartData = result.yearlySchedule.map(s => ({
     label: `Yr ${s.year}`,
@@ -38,9 +62,9 @@ export const CagrCalculatorPage: React.FC = () => {
           </div>
 
           {/* Validation Alert */}
-          {(years <= 0 || initialValue <= 0) && (
+          {validationError && (
             <div role="alert" className="p-3 rounded-lg bg-semantic-warning/10 border border-semantic-warning/20 text-semantic-warningLight dark:text-semantic-warning text-xs">
-              {years <= 0 ? 'Time horizon must be greater than 0 years.' : 'Initial investment must be greater than $0.'}
+              {validationError}
             </div>
           )}
 
@@ -95,34 +119,48 @@ export const CagrCalculatorPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-4 rounded-lg bg-white dark:bg-graphite-card border border-black/[0.08] dark:border-white/[0.08]">
               <div className="text-[11px] text-graphite-lightMuted dark:text-graphite-muted">CAGR</div>
-              <div className="text-2xl font-mono font-medium text-primary tabular mt-1">{result.cagr}%</div>
+              <div className="text-2xl font-mono font-medium text-primary tabular mt-1">
+                {isInvalid ? '--' : `${result.cagr}%`}
+              </div>
               <div className="text-[10px] text-graphite-lightMuted dark:text-graphite-muted mt-0.5">Annualized compound rate</div>
             </div>
 
             <div className="p-4 rounded-lg bg-white dark:bg-graphite-card border border-black/[0.08] dark:border-white/[0.08]">
               <div className="text-[11px] text-graphite-lightMuted dark:text-graphite-muted">Total capital gain</div>
               <div className="text-2xl font-mono font-medium text-graphite-lightText dark:text-graphite-text tabular mt-1">
-                {result.totalGain >= 0 ? `$${result.totalGain.toLocaleString()}` : `-$${Math.abs(result.totalGain).toLocaleString()}`}
+                {isInvalid ? '--' : formatUsd(result.totalGain)}
               </div>
               <div className={`text-[10px] font-mono tabular mt-0.5 ${
-                result.totalReturnPercent >= 0
-                  ? 'text-semantic-positiveLight dark:text-semantic-positive'
-                  : 'text-semantic-negativeLight dark:text-semantic-negative'
+                isInvalid
+                  ? 'text-graphite-lightMuted dark:text-graphite-muted'
+                  : result.totalReturnPercent >= 0
+                    ? 'text-semantic-positiveLight dark:text-semantic-positive'
+                    : 'text-semantic-negativeLight dark:text-semantic-negative'
               }`}>
-                {result.totalReturnPercent >= 0 ? `+${result.totalReturnPercent}% net gain` : `${result.totalReturnPercent}% net loss`}
+                {isInvalid ? 'Awaiting valid inputs' : result.totalReturnPercent >= 0 ? `+${result.totalReturnPercent}% net gain` : `${result.totalReturnPercent}% net loss`}
               </div>
             </div>
 
             <div className="p-4 rounded-lg bg-white dark:bg-graphite-card border border-black/[0.08] dark:border-white/[0.08]">
               <div className="text-[11px] text-graphite-lightMuted dark:text-graphite-muted">Capital multiple</div>
-              <div className="text-2xl font-mono font-medium text-graphite-lightText dark:text-graphite-text tabular mt-1">{(finalValue / Math.max(1, initialValue)).toFixed(2)}x</div>
-              <div className="text-[10px] text-graphite-lightMuted dark:text-graphite-muted mt-0.5">Over {years} years</div>
+              <div className="text-2xl font-mono font-medium text-graphite-lightText dark:text-graphite-text tabular mt-1">
+                {isInvalid ? '--' : `${(finalValue / initialValue).toFixed(2)}x`}
+              </div>
+              <div className="text-[10px] text-graphite-lightMuted dark:text-graphite-muted mt-0.5">
+                {isInvalid ? 'Enter positive values' : `Over ${years} years`}
+              </div>
             </div>
           </div>
 
           <div className="p-5 rounded-xl bg-white dark:bg-graphite-card border border-black/[0.08] dark:border-white/[0.08] space-y-3">
             <div className="text-xs font-medium text-graphite-lightText dark:text-graphite-text">Geometric compounding trajectory</div>
-            <LineChart data={chartData} height={220} valuePrefix="$" seriesName="Compounding Trajectory" />
+            {isInvalid ? (
+              <div className="h-[220px] flex items-center justify-center text-xs font-mono text-graphite-lightMuted dark:text-graphite-muted">
+                Enter valid positive parameters to plot trajectory.
+              </div>
+            ) : (
+              <LineChart data={chartData} height={220} valuePrefix="$" seriesName="Compounding Trajectory" />
+            )}
           </div>
         </div>
       </div>
@@ -185,7 +223,9 @@ export const CagrCalculatorPage: React.FC = () => {
           CAGR = (Ending balance / Initial investment) ^ (1 / years) − 1
         </p>
         <div className="p-2.5 rounded bg-black/[0.03] dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/[0.05] font-mono text-[11px] text-graphite-lightText dark:text-graphite-text">
-          (${finalValue.toLocaleString()} / ${initialValue.toLocaleString()})^(1 / {years}) − 1 = {result.cagr}%
+          {isInvalid
+            ? 'Formula evaluation paused until all inputs are valid.'
+            : `(${formatUsd(finalValue)} / ${formatUsd(initialValue)})^(1 / ${years}) − 1 = ${result.cagr}%`}
         </div>
       </div>
     </div>

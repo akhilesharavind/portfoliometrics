@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useId } from 'react';
 import { calculateCagr, CagrResult } from '../../services/calculatorEngine';
 import { GenerativeWidgetProps, WidgetPayloadMap } from './types';
+import { useOptionalStudioContext } from '../../context/StudioContext';
 import { ExternalLink } from 'lucide-react';
 
 export const CagrProjectionWidget: React.FC<GenerativeWidgetProps<WidgetPayloadMap['cagr_projection']>> = ({
@@ -8,6 +9,7 @@ export const CagrProjectionWidget: React.FC<GenerativeWidgetProps<WidgetPayloadM
   onNavigateTab
 }) => {
   const uid = useId();
+  const studio = useOptionalStudioContext();
   const gradId = `cagrAreaGrad-${uid}`;
   const [initialValue, setInitialValue] = useState<number>(payload?.initialValue ?? 10000);
   const [finalValue, setFinalValue] = useState<number>(payload?.finalValue ?? 50000);
@@ -227,7 +229,10 @@ export const CagrProjectionWidget: React.FC<GenerativeWidgetProps<WidgetPayloadM
 
         <button
           type="button"
-          onClick={() => onNavigateTab?.('cagr-calculator')}
+          onClick={() => {
+            studio?.setCagrParams({ initialValue, finalValue, years });
+            onNavigateTab?.('cagr-calculator');
+          }}
           className="px-3 py-1.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.09] text-graphite-lightText dark:text-graphite-text font-medium text-xs transition-colors flex items-center gap-1"
         >
           <span>Open in CAGR Studio</span>

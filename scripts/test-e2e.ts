@@ -963,11 +963,12 @@ async function main() {
     assert(!Number.isNaN(res.probabilityOfSuccess), 'Probability of success returned NaN');
   });
 
-  // T2.14: AI Assistant Empty Query Handling
+  // T2.14: AI Assistant Empty Query Handling (must not fabricate a portfolio)
   await runTest('T2.14', 'Boundary: AI Assistant handles empty or whitespace queries gracefully', () => {
     const res = processAiQuery('');
-    assert(res.text.length > 0, 'Expected helpful fallback text on empty query');
-    assert(res.backtestData !== undefined, 'Expected fallback backtest data');
+    assert(res.text.length > 0, 'Expected helpful guidance text on empty query');
+    assert(res.text.includes('Not Understood'), 'Expected explicit Not Understood guidance');
+    assert(res.backtestData === undefined, 'Empty query must not fabricate backtest data');
   });
 
   // T2.15: AI Assistant Special Characters / Script Injection

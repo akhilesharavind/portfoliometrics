@@ -16,6 +16,7 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
   const [prompt, setPrompt] = useState('');
+  const [promptError, setPromptError] = useState<string | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   const promptSuggestions = [
@@ -28,13 +29,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
   const handlePromptSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) {
-      onSelectTab('backtesting');
+      setPromptError('Enter a strategy question, ticker allocation, or select a preset below.');
       return;
     }
+    setPromptError(null);
     onSelectTab('ai-assistant', prompt);
   };
 
-  // Live telemetry data computed from historical backtest engine (60% VTI / 40% BND, 2015-2025)
+  // Live telemetry data computed from historical backtest engine (60% VTI / 40% BND, 2016-2025, 10Y)
   const heroBacktest = useMemo(
     () =>
       runBacktest({
@@ -43,7 +45,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
           { symbol: 'BND', weight: 40 }
         ],
         initialValue: 10000,
-        startYear: 2015,
+        startYear: 2016,
         endYear: 2025,
         benchmark: 'SPY',
         rebalancing: 'annually',
@@ -56,7 +58,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
 
   const heroPreviewChart = useMemo(
     () => [
-      { label: '2014', value: 10000, benchmark: 10000 },
+      { label: 'Start', value: 10000, benchmark: 10000 },
       ...heroBacktest.yearHistory.map((y) => ({
         label: String(y.year),
         value: y.endBalance,
@@ -131,7 +133,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
                   id="homepage-strategy-prompt"
                   type="text"
                   value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    if (promptError) setPromptError(null);
+                  }}
                   placeholder="Ask a strategy question or specify asset weights..."
                   className="w-full px-2 py-2 text-xs text-graphite-lightText dark:text-graphite-text bg-transparent placeholder-graphite-lightMuted dark:placeholder-graphite-muted focus:outline-none"
                 />
@@ -142,6 +147,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
                   Simulate Strategy
                 </button>
               </div>
+              {promptError && (
+                <p role="alert" className="mt-2 text-[11px] font-mono text-semantic-warningLight dark:text-semantic-warning">
+                  {promptError}
+                </p>
+              )}
 
               {/* Suggestion Chips */}
               <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -188,7 +198,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
                     <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
                     <span className="text-[10px] font-mono uppercase tracking-wider text-graphite-lightMuted dark:text-graphite-muted">TELEMETRY: STRATEGY BENCHMARK</span>
                   </div>
-                  <div className="text-xs font-medium text-graphite-lightText dark:text-graphite-text mt-0.5">Classic 60/40 · 60% VTI / 40% BND (2015-2025)</div>
+                  <div className="text-xs font-medium text-graphite-lightText dark:text-graphite-text mt-0.5">Classic 60/40 · 60% VTI / 40% BND (2016-2025)</div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs font-mono font-medium text-primary tabular">${heroBacktest.finalValue.toLocaleString()}</div>

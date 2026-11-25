@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { runMonteCarloSimulation, MonteCarloResult } from '../../services/monteCarloEngine';
 import { GenerativeWidgetProps, WidgetPayloadMap } from './types';
+import { useOptionalStudioContext } from '../../context/StudioContext';
 import { RefreshCw, ExternalLink } from 'lucide-react';
 
 export const MonteCarloFanWidget: React.FC<GenerativeWidgetProps<WidgetPayloadMap['monte_carlo_fan']>> = ({
   payload,
   onNavigateTab
 }) => {
+  const studio = useOptionalStudioContext();
   const initialInvestment = payload?.initialInvestment ?? 500000;
   const [expectedReturn, setExpectedReturn] = useState<number>(payload?.expectedAnnualReturn ?? 7.5);
   const annualVolatility = payload?.annualVolatility ?? 15.0;
@@ -277,7 +279,17 @@ export const MonteCarloFanWidget: React.FC<GenerativeWidgetProps<WidgetPayloadMa
 
         <button
           type="button"
-          onClick={() => onNavigateTab?.('monte-carlo')}
+          onClick={() => {
+            studio?.setMonteCarloParams({
+              initialInvestment,
+              expectedAnnualReturn: expectedReturn,
+              annualVolatility,
+              annualWithdrawal,
+              inflationRate: 2.5,
+              years
+            });
+            onNavigateTab?.('monte-carlo');
+          }}
           className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary-hover text-white font-medium text-xs transition-colors flex items-center gap-1"
         >
           <span>Open in Retirement Studio</span>

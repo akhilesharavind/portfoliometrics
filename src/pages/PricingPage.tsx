@@ -1,22 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
+import { useStudioContext, PlanTier } from '../context/StudioContext';
 
 interface SelectedPlanModalData {
-  name: string;
-  price: number;
+  name: PlanTier;
+  price: string;
   currency: string;
   cycle: string;
   features: string[];
 }
 
 export const PricingPage: React.FC = () => {
+  const { activePlan, setActivePlan } = useStudioContext();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [currency, setCurrency] = useState<'USD' | 'EUR'>('USD');
   const [selectedPlanModal, setSelectedPlanModal] = useState<SelectedPlanModalData | null>(null);
   const [checkoutConfirmed, setCheckoutConfirmed] = useState(false);
+  const [salesName, setSalesName] = useState('');
+  const [salesEmail, setSalesEmail] = useState('');
+  const [salesTeamSize, setSalesTeamSize] = useState('5-20 seats');
+  const [salesSubmitted, setSalesSubmitted] = useState(false);
 
   const currSymbol = currency === 'USD' ? '$' : '€';
   const multiplier = currency === 'USD' ? 1 : 0.92;
+  const formatPrice = (val: number) => (Number.isInteger(val) ? String(val) : val.toFixed(2));
 
   // Handle Escape key to dismiss dialog
   useEffect(() => {
@@ -30,7 +37,15 @@ export const PricingPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedPlanModal]);
 
-  const plans = [
+  const plans: {
+    name: PlanTier;
+    priceMonthly: number;
+    priceYearly: number;
+    description: string;
+    features: string[];
+    cta: string;
+    highlighted: boolean;
+  }[] = [
     {
       name: 'Free',
       priceMonthly: 0,
@@ -44,13 +59,13 @@ export const PricingPage: React.FC = () => {
         'Full popular portfolio library access',
         'Local client-side execution'
       ],
-      cta: 'Active Plan (Included)',
+      cta: activePlan === 'Free' ? 'Active Plan (Included)' : 'Switch to Free Tier',
       highlighted: false
     },
     {
       name: 'Pro',
-      priceMonthly: Math.round(12 * multiplier),
-      priceYearly: Math.round(9.6 * multiplier),
+      priceMonthly: Number((12 * multiplier).toFixed(2)),
+      priceYearly: Number((12 * 0.8 * multiplier).toFixed(2)),
       description: 'Advanced analytics and automated research reporting.',
       features: [
         'Everything in Free',
@@ -60,13 +75,13 @@ export const PricingPage: React.FC = () => {
         'High-resolution PDF report export',
         'Unlimited saved custom portfolios'
       ],
-      cta: 'Subscribe to Pro Tier',
+      cta: activePlan === 'Pro' ? 'Active Plan (Pro)' : 'Subscribe to Pro Tier',
       highlighted: true
     },
     {
       name: 'Institutional',
-      priceMonthly: Math.round(39 * multiplier),
-      priceYearly: Math.round(31.2 * multiplier),
+      priceMonthly: Number((39 * multiplier).toFixed(2)),
+      priceYearly: Number((39 * 0.8 * multiplier).toFixed(2)),
       description: 'Multi-seat access for RIAs, family offices, and research teams.',
       features: [
         'Everything in Pro',
@@ -75,21 +90,22 @@ export const PricingPage: React.FC = () => {
         'Team workspaces and permission roles',
         'Dedicated quantitative support'
       ],
-      cta: 'Contact Enterprise Sales',
+      cta: activePlan === 'Institutional' ? 'Active Plan (Institutional)' : 'Contact Enterprise Sales',
       highlighted: false
     }
   ];
 
   const handlePlanSelect = (plan: typeof plans[0]) => {
-    const price = billingCycle === 'monthly' ? plan.priceMonthly : plan.priceYearly;
+    const rawPrice = billingCycle === 'monthly' ? plan.priceMonthly : plan.priceYearly;
     setSelectedPlanModal({
       name: plan.name,
-      price,
+      price: formatPrice(rawPrice),
       currency: currSymbol,
       cycle: billingCycle,
       features: plan.features
     });
     setCheckoutConfirmed(false);
+    setSalesSubmitted(false);
   };
 
   return (
@@ -161,12 +177,17 @@ export const PricingPage: React.FC = () => {
             </button>
           </div>
         </div>
+        {currency === 'EUR' && (
+          <p className="text-[11px] font-mono text-graphite-lightMuted dark:text-graphite-muted mt-2">
+            Converted at fixed reference rate: 1 USD = 0.92 EUR
+          </p>
+        )}
       </div>
 
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((p) => {
-          const price = billingCycle === 'monthly' ? p.priceMonthly : p.priceYearly;
+          const price = formatPrice(billingCycle === 'monthly' ? p.priceMonthly : p.priceYearly);
 
           return (
             <div
@@ -179,7 +200,7 @@ export const PricingPage: React.FC = () => {
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-medium text-graphite-lightText dark:text-graphite-text">{p.name}</h3>
+                  <h2 className="text-base font-medium text-graphite-lightText dark:text-graphite-text">{p.name}</h2>
                   {p.highlighted && (
                     <span className="text-[10px] font-mono uppercase tracking-wider text-primary font-semibold">Standard</span>
                   )}
@@ -232,11 +253,15 @@ export const PricingPage: React.FC = () => {
           >
             <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06]">
               <h2 id="pricing-dialog-title" className="text-sm font-medium text-graphite-lightText dark:text-graphite-text">
-                {selectedPlanModal.name === 'Free' ? 'Free Tier Details' : `Confirm ${selectedPlanModal.name} Plan`}
+                {selectedPlanModal.name === 'Institutional'
+                  ? 'Contact Enterprise Sales'
+                  : selectedPlanModal.name === 'Free'
+                    ? 'Free Tier Details'
+                    : `Confirm ${selectedPlanModal.name} Plan`}
               </h2>
               <button
                 type="button"
-                onClick={() => { setSelectedPlanModal(null); setCheckoutConfirmed(false); }}
+                onClick={() => { setSelectedPlanModal(null); setCheckoutConfirmed(false); setSalesSubmitted(false); }}
                 aria-label="Close dialog"
                 className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md text-graphite-lightMuted dark:text-graphite-muted hover:text-graphite-lightText dark:hover:text-graphite-text transition-colors"
               >
@@ -244,7 +269,86 @@ export const PricingPage: React.FC = () => {
               </button>
             </div>
 
-            {checkoutConfirmed ? (
+            {selectedPlanModal.name === 'Institutional' ? (
+              salesSubmitted ? (
+                <div className="space-y-4 py-2">
+                  <div className="p-3.5 rounded-lg bg-semantic-positive/10 border border-semantic-positive/20 text-xs text-semantic-positive">
+                    <div className="font-medium">Enterprise inquiry recorded</div>
+                    <p className="mt-1 text-[11px] text-graphite-lightSecondary dark:text-graphite-secondary">
+                      Thank you, {salesName || 'team'}. Our institutional desk will follow up at {salesEmail || 'your email'} regarding {salesTeamSize}.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedPlanModal(null); setSalesSubmitted(false); }}
+                    className="w-full py-2.5 px-4 min-h-[44px] rounded-md bg-primary hover:bg-primary-hover text-white text-xs font-medium transition-colors"
+                  >
+                    Return to PortfolioMetrics
+                  </button>
+                </div>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setSalesSubmitted(true);
+                  }}
+                  className="space-y-3 text-xs"
+                >
+                  <div>
+                    <label htmlFor="sales-name" className="block text-graphite-lightSecondary dark:text-graphite-secondary mb-1">Full name</label>
+                    <input
+                      id="sales-name"
+                      type="text"
+                      required
+                      value={salesName}
+                      onChange={(e) => setSalesName(e.target.value)}
+                      placeholder="Alex Rivera"
+                      className="w-full px-3 py-2 rounded-md bg-graphite-lightRaised dark:bg-graphite-raised border border-black/[0.08] dark:border-white/[0.08] text-graphite-lightText dark:text-graphite-text"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="sales-email" className="block text-graphite-lightSecondary dark:text-graphite-secondary mb-1">Work email</label>
+                    <input
+                      id="sales-email"
+                      type="email"
+                      required
+                      value={salesEmail}
+                      onChange={(e) => setSalesEmail(e.target.value)}
+                      placeholder="alex@firm.com"
+                      className="w-full px-3 py-2 rounded-md bg-graphite-lightRaised dark:bg-graphite-raised border border-black/[0.08] dark:border-white/[0.08] text-graphite-lightText dark:text-graphite-text"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="sales-team-size" className="block text-graphite-lightSecondary dark:text-graphite-secondary mb-1">Team size</label>
+                    <select
+                      id="sales-team-size"
+                      value={salesTeamSize}
+                      onChange={(e) => setSalesTeamSize(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md bg-graphite-lightRaised dark:bg-graphite-raised border border-black/[0.08] dark:border-white/[0.08] text-graphite-lightText dark:text-graphite-text"
+                    >
+                      <option value="5-20 seats">5-20 seats</option>
+                      <option value="21-100 seats">21-100 seats</option>
+                      <option value="100+ seats">100+ seats</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlanModal(null)}
+                      className="flex-1 py-2.5 px-3 min-h-[44px] rounded-md bg-black/[0.04] dark:bg-white/[0.05] text-graphite-lightSecondary dark:text-graphite-secondary font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 px-3 min-h-[44px] rounded-md bg-primary hover:bg-primary-hover text-white font-medium"
+                    >
+                      Submit Inquiry
+                    </button>
+                  </div>
+                </form>
+              )
+            ) : checkoutConfirmed ? (
               <div className="space-y-4 py-2">
                 <div className="p-3.5 rounded-lg bg-semantic-positive/10 border border-semantic-positive/20 text-xs text-semantic-positive">
                   <div className="font-medium">Plan selected successfully</div>
@@ -303,7 +407,10 @@ export const PricingPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCheckoutConfirmed(true)}
+                    onClick={() => {
+                      setActivePlan(selectedPlanModal.name);
+                      setCheckoutConfirmed(true);
+                    }}
                     className="flex-1 py-2.5 px-3 min-h-[44px] rounded-md bg-primary hover:bg-primary-hover text-white text-xs font-medium transition-colors"
                   >
                     Confirm Selection

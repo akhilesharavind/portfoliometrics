@@ -30,7 +30,7 @@ export const LineChart: React.FC<LineChartProps> = ({
   const rawMax = finiteValues.length > 0 ? Math.max(...finiteValues) : 0;
   const span = rawMax - rawMin;
   const pad = (span > 0 ? span : Math.abs(rawMax) || 1) * 0.08;
-  const min = rawMin - pad;
+  const min = rawMin >= 0 ? Math.max(0, rawMin - pad) : rawMin - pad;
   const max = rawMax + pad;
   const range = max - min || 1;
 
@@ -65,7 +65,13 @@ export const LineChart: React.FC<LineChartProps> = ({
 
   return (
     <div className="w-full overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto select-none" style={{ minWidth: 480 }}>
+      <svg
+        role="img"
+        aria-label={`${seriesName || 'Portfolio'} performance chart`}
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full h-auto select-none"
+        style={{ minWidth: 480 }}
+      >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#ff5f14" stopOpacity="0.16" />
