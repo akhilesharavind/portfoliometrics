@@ -146,9 +146,11 @@ export function runBacktest(params: BacktestParams): BacktestResult {
 
   const safeCashFlow = Number.isFinite(cashFlowAmount) ? cashFlowAmount : 0;
 
-  // Deterministic zero-mean intra-year seasonal weights for realistic monthly peak-to-trough paths
+  // Deterministic zero-mean intra-year seasonal weights for realistic monthly peak-to-trough paths.
   // Sum of weights = 0, so the 12-month compounded product equals the exact annual return.
-  const intraYearShape = [-0.55, -0.95, 0.35, 0.45, -0.35, 0.25, 0.4, -0.45, -0.75, 0.5, 0.6, 0.5];
+  // Negative Q1-Q3 dip followed by Q4 partial recovery produces realistic intra-year drawdowns
+  // deeper than calendar-year closes.
+  const intraYearShape = [-0.4, -0.7, -0.5, 0.1, -0.6, -0.8, 0.2, -0.7, -1.1, 1.3, 1.6, 1.6];
 
   for (let year = startYear; year <= endYear; year++) {
     const yearStartBalance = sleeveBalances.reduce((sum, b) => sum + b, 0);
@@ -159,14 +161,14 @@ export function runBacktest(params: BacktestParams): BacktestResult {
       const annualFactor = 1 + ret / 100;
       if (annualFactor <= 0) return Array(12).fill(0);
       const baseLog = Math.log(annualFactor) / 12;
-      const volAmp = (asset?.annualVolatility ?? 0.14) * (ret < 0 ? 0.22 : 0.14);
+      const volAmp = (asset?.annualVolatility ?? 0.14) * (ret < 0 ? 0.32 : 0.22);
       return intraYearShape.map(w => Math.exp(baseLog + volAmp * w));
     });
 
     const bRet = benchmarkAsset?.annualReturns[year] ?? 10.0;
     const bAnnualFactor = 1 + bRet / 100;
     const bMonthlyFactors = bAnnualFactor > 0
-      ? intraYearShape.map(w => Math.exp(Math.log(bAnnualFactor) / 12 + (benchmarkAsset?.annualVolatility ?? 0.15) * (bRet < 0 ? 0.22 : 0.14) * w))
+      ? intraYearShape.map(w => Math.exp(Math.log(bAnnualFactor) / 12 + (benchmarkAsset?.annualVolatility ?? 0.15) * (bRet < 0 ? 0.32 : 0.22) * w))
       : Array(12).fill(0);
 
     let yearTwrFactor = 1;

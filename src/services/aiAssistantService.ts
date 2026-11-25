@@ -733,14 +733,24 @@ export function processAiQuery(
       riskFreeRate: 0.04
     });
 
+    const blendedYield = 0.0304; // 50% SCHD (3.6%) + 30% SPY (1.4%) + 20% VNQ (4.1%)
+    const incomeSample = res.yearHistory.slice(-5).map(y => {
+      const estIncome = Math.round(y.endBalance * blendedYield);
+      return `| ${y.year} | $${y.endBalance.toLocaleString('en-US')} | $${estIncome.toLocaleString('en-US')}/yr | $${Math.round(estIncome / 12).toLocaleString('en-US')}/mo |`;
+    }).join('\n');
+
     const text = `### Dividend Growth & Cash Flow Portfolio\n\n` +
-      `Focused on sustained dividend compounding through **SCHD (50%)**, **SPY (30%)**, and **VNQ (20%)**.\n\n` +
+      `Focused on sustained dividend compounding through **SCHD (50%, ~3.6% yield)**, **SPY (30%, ~1.4% yield)**, and **VNQ (20%, ~4.1% yield)** for a blended **3.04% portfolio yield**.\n\n` +
       `**Performance Summary:**\n` +
       `- **CAGR**: **${res.cagr}%**\n` +
       `- **Sharpe Ratio**: **${res.sharpeRatio}**\n` +
       `- **Max Drawdown**: **${res.maxDrawdown}%**\n` +
       `- **Final Balance**: **$${res.finalValue.toLocaleString('en-US')}**\n\n` +
-      `*Strategic Verdict*: Consistent risk-adjusted cash flow with strong downside defense during market pullbacks.`;
+      `**Estimated Annual Dividend Cash Flow (Trailing 5 Years):**\n` +
+      `| Year | Portfolio Balance | Est. Annual Dividend | Est. Monthly Income |\n` +
+      `|---|---|---|---|\n` +
+      `${incomeSample}\n\n` +
+      `*Strategic Verdict*: Consistent risk-adjusted cash flow with growing annual dividend income.`;
 
     const parts: ChatMessagePart[] = [
       { type: 'text', content: text },

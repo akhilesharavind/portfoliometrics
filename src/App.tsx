@@ -21,7 +21,7 @@ function CopilotFloatingTrigger() {
     <button
       type="button"
       onClick={toggleCopilot}
-      aria-label="Toggle Studio Copilot drawer"
+      aria-label="COPILOT [SYS]"
       className="fixed bottom-6 right-6 z-40 px-3.5 py-2 rounded-md bg-white dark:bg-graphite-card border border-black/[0.08] dark:border-white/[0.08] text-graphite-lightText dark:text-graphite-text text-xs font-mono font-medium shadow-sm hover:border-primary transition-colors flex items-center gap-2 select-none"
     >
       <span className="w-2 h-2 rounded-full bg-primary inline-block" />
@@ -45,7 +45,7 @@ const VALID_TABS = new Set([
 const getTabFromPath = (pathname: string): string => {
   const clean = pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
   if (!clean) return 'home';
-  return VALID_TABS.has(clean) ? clean : 'home';
+  return VALID_TABS.has(clean) ? clean : 'not-found';
 };
 
 const getPathFromTab = (tab: string): string => {
@@ -176,6 +176,27 @@ function MainApp() {
 
         {currentTab === 'pricing' && (
           <PricingPage />
+        )}
+
+        {currentTab === 'not-found' && (
+          <div className="max-w-xl mx-auto px-6 py-24 text-center space-y-4">
+            <div className="text-xs font-mono uppercase tracking-widest text-primary font-semibold">
+              [404 / NOT FOUND]
+            </div>
+            <h1 className="text-3xl font-medium tracking-tight text-graphite-lightText dark:text-graphite-text">
+              Page not found
+            </h1>
+            <p className="text-xs text-graphite-lightSecondary dark:text-graphite-secondary">
+              The requested route does not exist in PortfolioMetrics.
+            </p>
+            <button
+              type="button"
+              onClick={() => handleSelectTab('home')}
+              className="min-h-[44px] px-5 py-2.5 rounded-md bg-primary hover:bg-primary-hover text-white text-xs font-medium transition-colors"
+            >
+              Return Home
+            </button>
+          </div>
         )}
       </main>
 

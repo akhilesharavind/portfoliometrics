@@ -49,7 +49,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button 
           type="button"
           onClick={() => handleNav('home')}
-          aria-label="PORTFOLIOMETRICS"
           className="flex items-center gap-2.5 select-none text-left bg-transparent border-0 p-0 focus-visible:ring-2 focus-visible:ring-primary rounded"
         >
           <div className="w-5 h-5 rounded-[3px] bg-primary flex items-center justify-center text-white font-mono text-[11px] font-bold" aria-hidden="true">

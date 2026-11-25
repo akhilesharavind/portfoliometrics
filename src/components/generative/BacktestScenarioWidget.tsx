@@ -237,7 +237,7 @@ export const BacktestScenarioWidget: React.FC<GenerativeWidgetProps<WidgetPayloa
                 onChange={(e) => setStartYear(Number(e.target.value))}
                 className="w-full text-[11px] px-1.5 py-1 rounded bg-white dark:bg-graphite-card border border-black/[0.08] dark:border-white/[0.08] font-mono tabular text-graphite-lightText dark:text-graphite-text"
               >
-                {[2010, 2012, 2015, 2018, 2020].map(y => (
+                {[2010, 2012, 2014, 2015, 2016, 2018, 2020].map(y => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>

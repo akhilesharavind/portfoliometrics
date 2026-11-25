@@ -553,6 +553,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
               <button
                 type="button"
                 aria-expanded={expandedFaq === idx}
+                aria-controls={`faq-panel-${idx}`}
                 onClick={() => setExpandedFaq(expandedFaq === idx ? null : idx)}
                 className="w-full min-h-[44px] flex items-center justify-between text-left text-xs font-medium text-graphite-lightText dark:text-graphite-text focus-visible:ring-2 focus-visible:ring-primary rounded py-2 px-1 group"
               >
@@ -563,11 +564,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTab }) => {
                   <ChevronDown aria-hidden="true" className="w-3.5 h-3.5 opacity-50 shrink-0" />
                 )}
               </button>
-              {expandedFaq === idx && (
-                <p className="mt-2 text-xs leading-relaxed text-graphite-lightSecondary dark:text-graphite-secondary pl-1">
-                  {faq.a}
-                </p>
-              )}
+              <p
+                id={`faq-panel-${idx}`}
+                hidden={expandedFaq !== idx}
+                className="mt-2 text-xs leading-relaxed text-graphite-lightSecondary dark:text-graphite-secondary pl-1"
+              >
+                {faq.a}
+              </p>
             </div>
           ))}
         </div>

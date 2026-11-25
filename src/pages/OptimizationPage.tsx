@@ -78,8 +78,15 @@ export const OptimizationPage: React.FC = () => {
     setResult(runOptimization(inputs, riskFreeRate));
   };
 
+  const [assetNotice, setAssetNotice] = useState<string | null>(null);
+
   const handleAddSymbol = (sym: string) => {
-    if (selectedSymbols.includes(sym) || selectedSymbols.length >= 8) return;
+    if (selectedSymbols.includes(sym)) return;
+    if (selectedSymbols.length >= 8) {
+      setAssetNotice('Maximum 8 assets allowed for covariance matrix optimization.');
+      return;
+    }
+    setAssetNotice(null);
     const updated = [...selectedSymbols, sym];
     setSelectedSymbols(updated);
     const inputs = updated.map(s => ({
@@ -90,7 +97,11 @@ export const OptimizationPage: React.FC = () => {
   };
 
   const handleRemoveSymbol = (sym: string) => {
-    if (selectedSymbols.length <= 2) return;
+    if (selectedSymbols.length <= 2) {
+      setAssetNotice('Minimum 2 assets required for covariance matrix optimization.');
+      return;
+    }
+    setAssetNotice(null);
     const updated = selectedSymbols.filter(s => s !== sym);
     setSelectedSymbols(updated);
     const inputs = updated.map(s => ({
@@ -180,15 +191,21 @@ export const OptimizationPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleRemoveSymbol(sym)}
-                disabled={selectedSymbols.length <= 2}
                 aria-label={`Remove ${sym} from universe`}
-                className="opacity-60 hover:opacity-100 disabled:opacity-20 ml-1 p-1"
+                className={`hover:opacity-100 ml-1 p-1 ${
+                  selectedSymbols.length <= 2 ? 'opacity-30 cursor-not-allowed' : 'opacity-60'
+                }`}
               >
                 ×
               </button>
             </div>
           ))}
         </div>
+        {assetNotice && (
+          <p role="alert" className="text-[11px] text-semantic-warningLight dark:text-semantic-warning">
+            {assetNotice}
+          </p>
+        )}
       </div>
 
       {/* Comparison Portfolio Cards */}

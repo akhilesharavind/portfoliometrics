@@ -71,7 +71,7 @@ export const MonteCarloPage: React.FC = () => {
           Monte Carlo simulation
         </h1>
         <p className="text-xs text-graphite-lightSecondary dark:text-graphite-secondary">
-          1,000 stochastic geometric Brownian paths under inflation-adjusted cash withdrawal schedules.
+          {simCount.toLocaleString()} stochastic geometric Brownian paths under inflation-adjusted cash withdrawal schedules ({studio?.activePlan === 'Pro' || studio?.activePlan === 'Institutional' ? `${studio.activePlan} tier` : 'Free tier: 1,000 trials'}).
         </p>
       </div>
 
@@ -176,14 +176,17 @@ export const MonteCarloPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex justify-end pt-2">
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-[11px] font-mono text-graphite-lightMuted dark:text-graphite-muted">
+            Active compute: {simCount.toLocaleString()} trials ({studio?.activePlan ?? 'Free'})
+          </span>
           <button
             type="button"
             disabled={initialInvestment <= 0}
             onClick={handleSimulate}
             className="min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary hover:bg-primary-hover disabled:opacity-40 text-white text-xs font-medium transition-colors"
           >
-            <span>Run 1,000 simulations</span>
+            <span>Run {simCount.toLocaleString()} simulations</span>
           </button>
         </div>
       </div>

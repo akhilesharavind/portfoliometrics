@@ -544,9 +544,10 @@ export const BacktestingPage: React.FC<BacktestingPageProps> = ({ initialAllocat
                 <button
                   type="button"
                   onClick={() => handleRemoveAsset(idx)}
-                  disabled={allocations.length <= 1}
                   aria-label={`Remove ${alloc.symbol} from portfolio`}
-                  className="p-1.5 text-graphite-lightMuted dark:text-graphite-muted hover:text-semantic-negativeLight dark:hover:text-semantic-negative disabled:opacity-20 transition-colors"
+                  className={`p-1.5 text-graphite-lightMuted dark:text-graphite-muted hover:text-semantic-negativeLight dark:hover:text-semantic-negative transition-colors ${
+                    allocations.length <= 1 ? 'opacity-40 cursor-not-allowed' : ''
+                  }`}
                 >
                   <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
                 </button>
@@ -625,7 +626,7 @@ export const BacktestingPage: React.FC<BacktestingPageProps> = ({ initialAllocat
                   onChange={(e) => setStartYear(Number(e.target.value))}
                   className="w-full px-2 py-1.5 rounded-md bg-graphite-lightRaised dark:bg-graphite-raised border border-black/[0.08] dark:border-white/[0.08] text-graphite-lightText dark:text-graphite-text tabular font-mono"
                 >
-                  {[2010, 2012, 2015, 2018, 2020].map(y => (
+                  {[2010, 2012, 2014, 2015, 2016, 2018, 2020].map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
@@ -706,7 +707,9 @@ export const BacktestingPage: React.FC<BacktestingPageProps> = ({ initialAllocat
         </div>
 
         <div className="p-4 rounded-lg bg-white dark:bg-graphite-card border border-black/[0.08] dark:border-white/[0.08]">
-          <div className="text-[11px] text-graphite-lightMuted dark:text-graphite-muted">CAGR</div>
+          <div className="text-[11px] text-graphite-lightMuted dark:text-graphite-muted">
+            {cashFlowType === 'none' ? 'CAGR' : 'CAGR (TWR)'}
+          </div>
           <div className="text-xl font-mono font-medium text-graphite-lightText dark:text-graphite-text tabular mt-1">
             {result.cagr}%
           </div>
