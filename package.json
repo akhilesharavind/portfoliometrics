@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Quantitative portfolio backtesting, Markowitz optimization, Monte Carlo simulation, and financial calculators.",
+  "homepage": "https://portfoliometrics.vercel.app/",
   "author": "Akhilesh Aravind",
   "type": "module",
   "scripts": {

@@ -2,6 +2,8 @@
 
 PortfolioMetrics is a client-side quantitative finance web application for historical portfolio backtesting, Markowitz efficient frontier optimization, and Monte Carlo retirement simulations. It also includes parametric compound interest and CAGR calculators alongside an interactive strategy copilot.
 
+Live website: https://portfoliometrics.vercel.app/
+
 ## Prerequisites
 
 - Node.js 18 or later
